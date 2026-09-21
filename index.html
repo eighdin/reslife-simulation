@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ledger &amp; Line — Financial Choices Simulation</title>
+  <meta name="description" content="A 15-minute financial decision-making simulation: build credit score and net worth through ten realistic money choices." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+
+    <div class="masthead">
+      <h1>Ledger &amp; Line</h1>
+      <span class="session-tag">Session <strong id="session-code-display">default</strong></span>
+    </div>
+
+    <!-- ===================== INTRO ===================== -->
+    <section id="screen-intro" class="card">
+      <p class="eyebrow">A guided financial choices simulation</p>
+      <p class="intro-lede">Over eighteen rounds, you'll face real financial decisions — the kind that show up in your first apartment, first job, and first credit card. Every choice moves two numbers: your <strong>credit score</strong> and your <strong>net worth</strong>. Nobody "loses" — you can absolutely end up in debt, and that's the point: you'll feel what it costs, without it costing you anything real. Some outcomes are certain; some are a genuine gamble, the way real financial decisions often are.</p>
+
+      <label class="field-label" for="player-name">Your name (shown on the leaderboard)</label>
+      <input id="player-name" type="text" maxlength="40" placeholder="e.g. Jordan R." autocomplete="off" />
+      <button id="btn-start" class="btn-primary" type="button">Start the simulation →</button>
+
+      <ul class="rules-list">
+        <li>Eighteen rounds, a couple of choices each — read the terms, pick what you'd actually do.</li>
+        <li>Debt you carry keeps accruing interest between rounds, and some choices carry real risk, just like in real life.</li>
+        <li>Your live score feeds the shared leaderboard for this session.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== ROUND ===================== -->
+    <section id="screen-round" class="card" hidden>
+      <div class="top-row">
+        <span id="round-counter">Round 1 of 10</span>
+        <span id="timer" class="tnum">15:00</span>
+      </div>
+
+      <div id="stat-bar"></div>
+
+      <div id="debt-panel" class="debt-panel" hidden>
+        <p class="debt-panel-label">Make an extra payment — any round, any amount you can afford</p>
+        <div id="debt-rows" class="debt-rows"></div>
+      </div>
+
+      <div id="tick-banner" hidden></div>
+
+      <span id="round-tag" class="round-tag">Tag</span>
+      <h2 id="round-title">Title</h2>
+      <p id="round-text">Scenario text.</p>
+
+      <div id="choices"></div>
+
+      <div id="feedback-panel" hidden>
+        <p id="feedback-note"></p>
+        <button id="btn-continue" class="btn-continue" type="button">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ===================== RESULT ===================== -->
+    <section id="screen-result" class="card" hidden>
+      <p class="eyebrow">Final statement</p>
+      <h2 id="result-name">Name</h2>
+
+      <div id="result-stats"></div>
+      <p id="result-takeaway"></p>
+
+      <div class="result-actions">
+        <a id="leaderboard-link" class="btn-secondary" href="leaderboard.html" target="_blank" rel="noopener">View live leaderboard →</a>
+        <button id="btn-play-again" class="btn-secondary" type="button">Play again</button>
+      </div>
+      <p id="sync-status" hidden></p>
+    </section>
+
+  </main>
+
+  <!-- Firebase (compat build — works with plain <script> tags, no bundler) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+
+  <script src="js/game-data.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/leaderboard-sync.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

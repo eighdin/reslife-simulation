@@ -1,0 +1,650 @@
+/* ==========================================================================
+   Design tokens
+   A "ledger / bank statement" system: paper surfaces, hairline rules,
+   tabular figures for money, a deep pine green for gains and a muted
+   clay red for debt. Fraunces carries headings, IBM Plex Sans carries
+   body text, IBM Plex Mono carries every number.
+   ========================================================================== */
+:root {
+  --paper: #eceae2;
+  --paper-raised: #f8f7f2;
+  --ink: #1b2430;
+  --ink-soft: #5b6472;
+  --line: #c9c7ba;
+  --accent: #2b5d50;
+  --accent-soft: #dce8e3;
+  --debt: #9a3b2e;
+  --debt-soft: #f3e1dd;
+  --gold: #a06d1f;
+  --gold-soft: #f0e3c8;
+  --radius: 6px;
+  --shadow: 0 1px 0 rgba(27, 36, 48, 0.06);
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14181a;
+    --paper-raised: #1b2023;
+    --ink: #e7e4d9;
+    --ink-soft: #9ca3a8;
+    --line: #33383a;
+    --accent: #59a891;
+    --accent-soft: #1e2e2a;
+    --debt: #d97b63;
+    --debt-soft: #33201b;
+    --gold: #d4a94f;
+    --gold-soft: #33291a;
+    --shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 2px solid var(--ink);
+}
+
+.masthead h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.session-tag {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.session-tag strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Card
+   ========================================================================== */
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.card + .card { margin-top: 1.25rem; }
+
+/* ==========================================================================
+   Intro screen
+   ========================================================================== */
+#screen-intro p {
+  color: var(--ink-soft);
+}
+
+.intro-lede {
+  font-size: 1.05rem;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.field-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.4rem;
+}
+
+#player-name {
+  width: 100%;
+  font: inherit;
+  font-size: 1.1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+#player-name:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  background: var(--accent);
+  color: var(--paper-raised);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.75rem 1.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.rules-list {
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.rules-list li {
+  display: flex;
+  gap: 0.6rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.rules-list li::before {
+  content: "—";
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Timer + round header
+   ========================================================================== */
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+#round-counter {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+#timer {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+}
+
+#timer.timer-low {
+  color: var(--debt);
+  border-color: var(--debt);
+}
+
+/* ==========================================================================
+   Stat bar
+   ========================================================================== */
+#stat-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: var(--paper-raised);
+}
+
+.stat {
+  padding: 0.65rem 0.6rem;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.stat:first-child { border-left: none; }
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-value.pos { color: var(--accent); }
+.stat-value.neg { color: var(--debt); }
+
+/* ==========================================================================
+   Debt panel — pay down a balance on any round, not just when a
+   scenario happens to offer it.
+   ========================================================================== */
+.debt-panel {
+  border: 1px solid var(--debt);
+  background: var(--debt-soft);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.debt-panel-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0 0 0.6rem;
+}
+
+.debt-rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.debt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.debt-row-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.debt-row-balance {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--debt);
+}
+
+.debt-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.debt-input {
+  width: 6.5rem;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  color: var(--ink);
+}
+
+.debt-input:disabled {
+  opacity: 0.5;
+}
+
+.btn-pay {
+  background: var(--ink);
+  color: var(--paper-raised);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.btn-pay:hover:not(:disabled) { opacity: 0.88; }
+.btn-pay:disabled { opacity: 0.4; cursor: default; }
+
+/* ==========================================================================
+   Tick banner
+   ========================================================================== */
+#tick-banner {
+  margin-bottom: 1.25rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tick-line {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+}
+
+.tick-glyph { font-family: var(--font-mono); flex-shrink: 0; }
+.tick-line.up .tick-glyph { color: var(--accent); }
+.tick-line.down .tick-glyph { color: var(--debt); }
+
+/* ==========================================================================
+   Round card
+   ========================================================================== */
+.round-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+#round-title {
+  font-size: 1.35rem;
+  margin-bottom: 0.6rem;
+}
+
+#round-text {
+  color: var(--ink-soft);
+  margin: 0 0 1.4rem;
+}
+
+#choices {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.96rem;
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.choice:hover, .choice:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.choice:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.choice:disabled.choice-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  opacity: 1;
+}
+
+.choice-letter {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--paper-raised);
+  background: var(--ink);
+  border-radius: 4px;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.choice-label { flex: 1; }
+
+/* ==========================================================================
+   Feedback panel
+   ========================================================================== */
+#feedback-panel {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+}
+
+#feedback-note {
+  margin: 0 0 1rem;
+  color: var(--ink);
+}
+
+.btn-continue {
+  background: var(--ink);
+  color: var(--paper-raised);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.2rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.btn-continue:hover { opacity: 0.88; }
+
+/* ==========================================================================
+   Result screen
+   ========================================================================== */
+#result-stats {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  border-top: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+
+.result-row:first-child { border-top: none; }
+.result-row span:last-child { font-weight: 600; }
+.result-row .pos { color: var(--accent); }
+.result-row .neg { color: var(--debt); }
+
+#result-takeaway {
+  color: var(--ink-soft);
+  margin: 0 0 1.5rem;
+}
+
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  background: transparent;
+  border-radius: var(--radius);
+  padding: 0.65rem 1.2rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.btn-secondary:hover { background: var(--paper); }
+
+#sync-status {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin-top: 1rem;
+}
+
+/* ==========================================================================
+   Leaderboard page
+   ========================================================================== */
+.lb-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.lb-page .masthead h1 { font-size: 1.9rem; }
+
+#not-configured {
+  border: 1px solid var(--debt);
+  background: var(--debt-soft);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.4rem;
+  color: var(--ink);
+}
+
+#not-configured code {
+  font-family: var(--font-mono);
+  background: var(--paper-raised);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+#boards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 800px) {
+  #boards { grid-template-columns: 1fr; }
+  #stat-bar { grid-template-columns: repeat(3, 1fr); }
+  .stat:nth-child(4) { border-left: none; }
+}
+
+.board h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.2rem;
+}
+
+.board-sub {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0 0 1rem;
+}
+
+table.board-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+}
+
+table.board-table th {
+  text-align: left;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 2px solid var(--ink);
+  padding: 0.4rem 0.5rem;
+}
+
+table.board-table td {
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.95rem;
+}
+
+table.board-table tr.rank-top {
+  background: var(--gold-soft);
+  font-weight: 600;
+}
+
+.rank-cell { color: var(--gold); width: 3.5rem; }
+.value-cell { text-align: right; font-variant-numeric: tabular-nums; }
+
+.board-empty {
+  padding: 1.5rem 0.5rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+footer.note {
+  margin-top: 2rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  text-align: center;
+}

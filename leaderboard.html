@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ledger &amp; Line — Live Leaderboard</title>
+  <meta name="description" content="Live leaderboard for the Ledger & Line financial choices simulation." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="lb-page">
+
+    <div class="masthead">
+      <h1>Live Leaderboard</h1>
+      <span class="session-tag">Session <strong id="session-code-display">default</strong></span>
+    </div>
+
+    <div id="not-configured" hidden>
+      <strong>Leaderboard sync isn't configured yet.</strong>
+      <p>Add your Firebase project details to <code>js/firebase-config.js</code> to turn this into a live, shared leaderboard. See <code>README.md</code> for the five-minute setup.</p>
+    </div>
+
+    <div id="boards">
+      <section class="board">
+        <h2>Top Credit Scores</h2>
+        <p class="board-sub">Payment history, low utilization, and time in good standing win here.</p>
+        <table class="board-table">
+          <thead><tr><th>Rank</th><th>Player</th><th style="text-align:right">Score</th></tr></thead>
+          <tbody id="credit-board-body"></tbody>
+        </table>
+        <p id="credit-empty" class="board-empty">Waiting for players to finish...</p>
+      </section>
+
+      <section class="board">
+        <h2>Top Net Worth</h2>
+        <p class="board-sub">Cash + investments, minus everything owed.</p>
+        <table class="board-table">
+          <thead><tr><th>Rank</th><th>Player</th><th style="text-align:right">Net Worth</th></tr></thead>
+          <tbody id="networth-board-body"></tbody>
+        </table>
+        <p id="networth-empty" class="board-empty">Waiting for players to finish...</p>
+      </section>
+    </div>
+
+    <footer class="note">Updates live as players complete rounds — leave this open on a projector or shared screen.</footer>
+  </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/leaderboard-sync.js"></script>
+  <script src="js/leaderboard-view.js"></script>
+</body>
+</html>
