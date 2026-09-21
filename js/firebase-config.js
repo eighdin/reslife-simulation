@@ -9,11 +9,11 @@
  * leaderboard page will say so.
  */
 window.FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCbH-XgL-rE9d2IHVIn0eLHecWKLTo00VM",
+  authDomain: "reslife-simulation-cwi.firebaseapp.com",
+  databaseURL: "https://reslife-simulation-cwi-default-rtdb.firebaseio.com",
+  projectId: "reslife-simulation-cwi",
+  storageBucket: "reslife-simulation-cwi.firebasestorage.app",
+  messagingSenderId: "1098218919829",
+  appId: "1:1098218919829:web:0f9946a0ee67cfd5ee489c"
 };
