@@ -365,6 +365,28 @@ button {
 .btn-pay:disabled { opacity: 0.4; cursor: default; }
 
 /* ==========================================================================
+   Interest warning — heads-up that debt interest is about to compound
+   ========================================================================== */
+.interest-warning {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border: 1px solid var(--gold);
+  background: var(--gold-soft);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.interest-warning-glyph {
+  font-family: var(--font-mono);
+  color: var(--gold);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
    Tick banner
    ========================================================================== */
 #tick-banner {

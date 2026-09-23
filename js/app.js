@@ -27,6 +27,7 @@
     statBar: document.getElementById("stat-bar"),
     debtPanel: document.getElementById("debt-panel"),
     debtRows: document.getElementById("debt-rows"),
+    interestWarning: document.getElementById("interest-warning"),
     tickBanner: document.getElementById("tick-banner"),
     roundTag: document.getElementById("round-tag"),
     roundTitle: document.getElementById("round-title"),
@@ -129,9 +130,48 @@
     if (amount <= 0) return;
     state.cash = G.round2(state.cash - amount);
     state[field] = G.round2(balance - amount);
+    // A payment resets that balance's own due date to a fresh N decisions
+    // out, same as it would after a real payment — independent of the
+    // other balance's countdown.
+    G.resetAccrualSchedule(state, field);
     renderStatBar();
     renderDebtPanel();
+    renderInterestWarning();
     submitProgress();
+  }
+
+  function describeAccrualCountdown(r) {
+    if (r === 1) return "right after this decision";
+    if (r === 2) return "after your next decision";
+    return "in " + r + " decisions";
+  }
+
+  // Each balance now has its own countdown (state.ccRoundsUntilAccrual /
+  // state.loanRoundsUntilAccrual — see game-data.js), so this just reads
+  // them straight off state rather than recomputing from the round index.
+  function renderInterestWarning() {
+    var parts = [];
+    if (state.ccDebt > 0 && state.ccRoundsUntilAccrual) {
+      parts.push({ what: "your credit card balance", r: state.ccRoundsUntilAccrual });
+    }
+    if (state.loanDebt > 0 && state.loanRoundsUntilAccrual) {
+      parts.push({ what: "your student loan balance", r: state.loanRoundsUntilAccrual });
+    }
+    if (!parts.length) {
+      els.interestWarning.hidden = true;
+      els.interestWarning.innerHTML = "";
+      return;
+    }
+    var text;
+    if (parts.length === 2 && parts[0].r === parts[1].r) {
+      text = "Interest accrues on your credit card and student loan balances " + describeAccrualCountdown(parts[0].r) + " — pay down what you can afford above before then.";
+    } else if (parts.length === 2) {
+      text = "Interest accrues on " + parts[0].what + " " + describeAccrualCountdown(parts[0].r) + ", and on " + parts[1].what + " " + describeAccrualCountdown(parts[1].r) + " — pay down what you can afford above before then.";
+    } else {
+      text = "Interest accrues on " + parts[0].what + " " + describeAccrualCountdown(parts[0].r) + " — pay down what you can afford above before then.";
+    }
+    els.interestWarning.hidden = false;
+    els.interestWarning.innerHTML = '<span class="interest-warning-glyph">⚠</span><span>' + text + "</span>";
   }
 
   function renderTick(messages) {
@@ -172,6 +212,7 @@
 
     renderStatBar();
     renderDebtPanel();
+    renderInterestWarning();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -197,6 +238,11 @@
     // other balance.
     var shortfall = G.settleCash(state);
 
+    // A balance that just appeared (or grew from zero) starts its own
+    // fresh countdown to first interest; one already running is left
+    // alone.
+    G.ensureAccrualSchedule(state);
+
     els.choices.hidden = true;
     els.feedbackPanel.hidden = false;
     var note = effect.note || "";
@@ -206,6 +252,7 @@
     els.feedbackNote.textContent = note;
     renderStatBar();
     renderDebtPanel();
+    renderInterestWarning();
     submitProgress();
   }
 
@@ -296,6 +343,7 @@
       name: name,
       playerId: name + "-" + Math.random().toString(36).slice(2, 8)
     });
+    G.ensureAccrualSchedule(state);
     roundIndex = 0;
     renderTick(null);
     renderRound();

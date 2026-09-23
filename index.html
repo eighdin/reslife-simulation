@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ledger &amp; Line — Financial Choices Simulation</title>
+  <title>Money Moves — Financial Choices Simulation</title>
   <meta name="description" content="A 15-minute financial decision-making simulation: build credit score and net worth through ten realistic money choices." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,21 +14,21 @@
   <main class="page">
 
     <div class="masthead">
-      <h1>Ledger &amp; Line</h1>
+      <h1>Money Moves</h1>
       <span class="session-tag">Session <strong id="session-code-display">default</strong></span>
     </div>
 
     <!-- ===================== INTRO ===================== -->
     <section id="screen-intro" class="card">
       <p class="eyebrow">A guided financial choices simulation</p>
-      <p class="intro-lede">Over eighteen rounds, you'll face real financial decisions — the kind that show up in your first apartment, first job, and first credit card. Every choice moves two numbers: your <strong>credit score</strong> and your <strong>net worth</strong>. Nobody "loses" — you can absolutely end up in debt, and that's the point: you'll feel what it costs, without it costing you anything real. Some outcomes are certain; some are a genuine gamble, the way real financial decisions often are.</p>
+      <p class="intro-lede">Over twenty rounds, you'll face real financial decisions — the kind that show up in your first apartment, first job, and first credit card. Every choice moves two numbers: your <strong>credit score</strong> and your <strong>net worth</strong>. Nobody "loses" — you can absolutely end up in debt, and that's the point: you'll feel what it costs, without it costing you anything real. Some outcomes are certain; some are a genuine gamble, the way real financial decisions often are.</p>
 
       <label class="field-label" for="player-name">Your name (shown on the leaderboard)</label>
       <input id="player-name" type="text" maxlength="40" placeholder="e.g. Jordan R." autocomplete="off" />
       <button id="btn-start" class="btn-primary" type="button">Start the simulation →</button>
 
       <ul class="rules-list">
-        <li>Eighteen rounds, a couple of choices each — read the terms, pick what you'd actually do.</li>
+        <li>Twenty rounds, a couple of choices each — read the terms, pick what you'd actually do.</li>
         <li>Debt you carry keeps accruing interest between rounds, and some choices carry real risk, just like in real life.</li>
         <li>Your live score feeds the shared leaderboard for this session.</li>
       </ul>
@@ -47,6 +47,8 @@
         <p class="debt-panel-label">Make an extra payment — any round, any amount you can afford</p>
         <div id="debt-rows" class="debt-rows"></div>
       </div>
+
+      <div id="interest-warning" class="interest-warning" hidden></div>
 
       <div id="tick-banner" hidden></div>
 

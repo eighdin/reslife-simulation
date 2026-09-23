@@ -1,7 +1,7 @@
-# Ledger & Line — a financial choices simulation
+# Money Moves — a financial choices simulation
 
 A single-session web activity for teaching basic personal finance. Each
-player works through eighteen realistic money decisions (a store-card
+player works through twenty realistic money decisions (a store-card
 discount, a car repair, a 401(k) match, a friend's hot stock tip, a
 payday loan offer...) and watches two numbers move: **credit score** and
 **net worth**. Several rounds have genuinely uncertain outcomes — the
@@ -22,9 +22,9 @@ from a folder on your laptop or from any static web host.
 
 | File | Purpose |
 |---|---|
-| `index.html` / `js/app.js` | The player experience — intro, eighteen rounds, results. |
+| `index.html` / `js/app.js` | The player experience — intro, twenty rounds, results. |
 | `leaderboard.html` / `js/leaderboard-view.js` | The read-only live leaderboard, meant for a projector or shared screen. |
-| `js/game-data.js` | All eighteen scenarios, choices, dollar amounts, and the interest/credit-score/randomness math. Edit this to customize content — nothing else needs to change. |
+| `js/game-data.js` | All twenty scenarios, choices, dollar amounts, and the interest/credit-score/randomness math. Edit this to customize content — nothing else needs to change. |
 | `js/firebase-config.js` | Where you paste your own Firebase project keys (see setup below). |
 | `js/leaderboard-sync.js` | Thin wrapper that reads/writes the shared leaderboard. Degrades gracefully if Firebase isn't configured. |
 | `css/style.css` | All styling for both pages. |

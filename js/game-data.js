@@ -36,16 +36,30 @@
   // swing (mildly positive on average, same as real markets over time,
   // but any single stretch can go either way).
   //
-  // Both compound once every TWO rounds, not every round — these rates
-  // are the per-round rate; applyTick() below squares the debt rates
-  // ((1+r)^2 - 1) so a tick correctly compounds two rounds' worth at
-  // once, rather than just doubling it.
-  var TICK_EVERY_N_ROUNDS = 2;
+  // Debt interest and investment growth are on separate clocks:
+  //   - Each balance (credit card, student loan) accrues interest
+  //     DEBT_ACCRUAL_EVERY_N_ROUNDS decisions after it first appears —
+  //     and a payment toward it (any amount, through the payment panel)
+  //     resets that balance's own countdown back to a fresh
+  //     DEBT_ACCRUAL_EVERY_N_ROUNDS, same as a real due date moving out
+  //     once you pay. Paying down the card doesn't touch the loan's
+  //     countdown, or vice versa. See ensureAccrualSchedule/
+  //     resetAccrualSchedule below and state.ccRoundsUntilAccrual /
+  //     state.loanRoundsUntilAccrual.
+  //   - Investment growth still checks in on a fixed schedule tied to
+  //     the absolute round count (INVEST_TICK_EVERY_N_ROUNDS), since
+  //     "the market" doesn't reset just because you touched your debt.
+  // These rates are the per-round rate; applyTick() below raises them
+  // to the DEBT_ACCRUAL_EVERY_N_ROUNDS power ((1+r)^N - 1) so a tick
+  // correctly compounds N decisions' worth at once, rather than just
+  // multiplying it by N.
+  var DEBT_ACCRUAL_EVERY_N_ROUNDS = 4;
+  var INVEST_TICK_EVERY_N_ROUNDS = 4;
   var CC_APR_PER_ROUND = 0.022;     // ~26% APR, compressed for pacing
   var LOAN_RATE_PER_ROUND = 0.005;  // ~6% APR, compressed for pacing
   var INVEST_SWING_MIN = -0.04;
   var INVEST_SWING_MAX = 0.07;
-  var MARKET_DIP_BEFORE_ROUND = 10;  // 0-indexed round id; a scripted correction, right before "windfall" (must land on a tick round)
+  var MARKET_DIP_BEFORE_ROUND = 12;  // 0-indexed round id; a scripted correction once a real portfolio exists (must land on an investment-tick round)
   var MARKET_DIP_FACTOR = -0.11;
 
   function creditBand(score) {
@@ -94,38 +108,70 @@
     return 0;
   }
 
+  // Keeps state.ccRoundsUntilAccrual / state.loanRoundsUntilAccrual in sync
+  // with whether a balance actually exists: a freshly-incurred balance
+  // (countdown not already running) starts a fresh DEBT_ACCRUAL_EVERY_N_ROUNDS
+  // countdown, and a balance that's been paid to zero has no countdown at
+  // all. Safe to call any time a balance may have just changed — it only
+  // ever initializes a missing countdown, never disturbs one in progress.
+  function ensureAccrualSchedule(state) {
+    state.ccRoundsUntilAccrual = state.ccDebt > 0
+      ? (state.ccRoundsUntilAccrual == null ? DEBT_ACCRUAL_EVERY_N_ROUNDS : state.ccRoundsUntilAccrual)
+      : null;
+    state.loanRoundsUntilAccrual = state.loanDebt > 0
+      ? (state.loanRoundsUntilAccrual == null ? DEBT_ACCRUAL_EVERY_N_ROUNDS : state.loanRoundsUntilAccrual)
+      : null;
+  }
+
+  // A payment through the payment panel resets that balance's own
+  // countdown to a fresh DEBT_ACCRUAL_EVERY_N_ROUNDS — the "due date"
+  // moves out to N decisions from whenever you paid, same as it would
+  // after a real payment, regardless of where the countdown previously
+  // stood. field is "ccDebt" or "loanDebt".
+  function resetAccrualSchedule(state, field) {
+    var key = field === "ccDebt" ? "ccRoundsUntilAccrual" : "loanRoundsUntilAccrual";
+    state[key] = state[field] > 0 ? DEBT_ACCRUAL_EVERY_N_ROUNDS : null;
+  }
+
   // Applies the automatic tick BEFORE round `nextIndex` is shown.
   // Returns { state, messages: [...] } — messages describe what happened,
-  // for a short "since last round" banner. Interest and investment growth
-  // only actually compound once every TICK_EVERY_N_ROUNDS rounds; on the
-  // rounds in between, this is a no-op (empty messages, unchanged state).
+  // for a short "since last round" banner. Each balance's interest is on
+  // its own countdown (see ensureAccrualSchedule/resetAccrualSchedule
+  // above); investment growth stays on the fixed, absolute-round-based
+  // INVEST_TICK_EVERY_N_ROUNDS schedule.
   function applyTick(state, nextIndex) {
     var s = Object.assign({}, state);
     var messages = [];
 
-    if (nextIndex <= 0 || nextIndex % TICK_EVERY_N_ROUNDS !== 0) {
-      return { state: s, messages: messages };
-    }
+    ensureAccrualSchedule(s);
 
     if (s.ccDebt > 0) {
-      var ccRate = Math.pow(1 + CC_APR_PER_ROUND, TICK_EVERY_N_ROUNDS) - 1;
-      var ccInterest = round2(s.ccDebt * ccRate);
-      s.ccDebt = round2(s.ccDebt + ccInterest);
-      messages.push({
-        dir: "down",
-        text: "Your credit card balance grew by " + fmt(ccInterest) + " in interest — two rounds' worth, compounded, at about 26% APR."
-      });
+      s.ccRoundsUntilAccrual -= 1;
+      if (s.ccRoundsUntilAccrual <= 0) {
+        var ccRate = Math.pow(1 + CC_APR_PER_ROUND, DEBT_ACCRUAL_EVERY_N_ROUNDS) - 1;
+        var ccInterest = round2(s.ccDebt * ccRate);
+        s.ccDebt = round2(s.ccDebt + ccInterest);
+        s.ccRoundsUntilAccrual = DEBT_ACCRUAL_EVERY_N_ROUNDS;
+        messages.push({
+          dir: "down",
+          text: "Your credit card balance grew by " + fmt(ccInterest) + " in interest — " + DEBT_ACCRUAL_EVERY_N_ROUNDS + " decisions' worth, compounded, at about 26% APR."
+        });
+      }
     }
     if (s.loanDebt > 0) {
-      var loanRate = Math.pow(1 + LOAN_RATE_PER_ROUND, TICK_EVERY_N_ROUNDS) - 1;
-      var loanInterest = round2(s.loanDebt * loanRate);
-      s.loanDebt = round2(s.loanDebt + loanInterest);
-      messages.push({
-        dir: "down",
-        text: "Your student loan accrued " + fmt(loanInterest) + " in interest — two rounds' worth, compounded, at about 6% APR."
-      });
+      s.loanRoundsUntilAccrual -= 1;
+      if (s.loanRoundsUntilAccrual <= 0) {
+        var loanRate = Math.pow(1 + LOAN_RATE_PER_ROUND, DEBT_ACCRUAL_EVERY_N_ROUNDS) - 1;
+        var loanInterest = round2(s.loanDebt * loanRate);
+        s.loanDebt = round2(s.loanDebt + loanInterest);
+        s.loanRoundsUntilAccrual = DEBT_ACCRUAL_EVERY_N_ROUNDS;
+        messages.push({
+          dir: "down",
+          text: "Your student loan accrued " + fmt(loanInterest) + " in interest — " + DEBT_ACCRUAL_EVERY_N_ROUNDS + " decisions' worth, compounded, at about 6% APR."
+        });
+      }
     }
-    if (s.invest > 0) {
+    if (s.invest > 0 && nextIndex > 0 && nextIndex % INVEST_TICK_EVERY_N_ROUNDS === 0) {
       var isDip = nextIndex === MARKET_DIP_BEFORE_ROUND;
       var rate = isDip ? MARKET_DIP_FACTOR : randRange(INVEST_SWING_MIN, INVEST_SWING_MAX);
       var change = round2(s.invest * rate);
@@ -161,20 +207,12 @@
       text: "You just moved in and need $150 worth of basics — sheets, a lamp, some kitchen stuff. At checkout, the cashier offers 20% off today's purchase if you open the store's credit card on the spot (26.99% APR, no annual fee). Same $150 worth of stuff either way — the only question is how you pay for it.",
       choices: [
         {
-          label: "Open the card, take the 20% off ($120), and pay it off in full next statement.",
+          label: "Open the card and take the 20% off ($120) — you'll pay it down yourself once it's on there.",
           effect: function () {
-            if (Math.random() < 0.75) {
-              return {
-                cash: -120,
-                credit: 9,
-                note: "You got the 20% discount and paid it off before interest applied — a new account handled cleanly is one of the few genuinely 'free' ways to nudge a thin credit file forward."
-              };
-            }
             return {
-              cash: -60,
-              ccDebt: 60,
-              credit: 2,
-              note: "The discount was real, but the month didn't go quite as planned — only half the balance got paid off, and the rest is now sitting on a card charging almost 27%. Even a good plan can slip when cash gets tight."
+              ccDebt: 120,
+              credit: 12,
+              note: "You got the 20% discount, and a new account cleanly opened is one of the few genuinely 'free' ways to nudge a thin credit file forward. The $120 is sitting on the card now, charging almost 27% — whether that stays free depends entirely on you sending it to the card via the payment panel above before interest applies."
             };
           }
         },
@@ -184,7 +222,7 @@
             return {
               cash: -15,
               ccDebt: 105,
-              credit: 4,
+              credit: 7,
               note: "You get the discount today and keep more cash on hand right now. The trade is $105 that starts compounding at nearly 27% APR until it's paid down."
             };
           }
@@ -216,12 +254,12 @@
           }
         },
         {
-          label: "Put it on a credit card and pay it off in full next paycheck.",
+          label: "Put it on a credit card — plan to pay it down before interest applies.",
           effect: function () {
             return {
-              cash: -450,
-              credit: 2,
-              note: "Using credit for a genuine emergency is reasonable, as long as 'next paycheck' actually arrives before interest applies. The card just moved the deadline, not the cost."
+              ccDebt: 450,
+              credit: 4,
+              note: "Using credit for a genuine emergency is reasonable — the $450 is now on the card instead of out of your checking account. Whether that stays free depends on you actually sending it to the card via the payment panel above before interest applies; the card only moved the deadline, not the cost."
             };
           }
         },
@@ -270,8 +308,8 @@
           label: "Cancel everything and go without for now.",
           effect: function () {
             return {
-              cash: 45,
-              note: "The most aggressive cut frees up the most cash — just make sure the trade-off (less convenience, less entertainment) is one you're actually fine with, or you'll just resubscribe next month anyway."
+              cash: 58,
+              note: "The most aggressive cut frees up the most cash — the full $58/month — just make sure the trade-off (less convenience, less entertainment) is one you're actually fine with, or you'll just resubscribe next month anyway."
             };
           }
         }
@@ -293,12 +331,12 @@
           }
         },
         {
-          label: "Put it on your credit card and pay the statement in full when it's due.",
+          label: "Put it on your credit card — pay the balance down yourself when you're ready.",
           effect: function () {
             return {
-              cash: -60,
-              credit: 2,
-              note: "Same $60 out the door, but routed through a card you pay off — a small, steady way to build payment history without ever paying interest on it."
+              ccDebt: 60,
+              credit: 4,
+              note: "Same $60 grocery run, just routed through the card instead of debit — it costs nothing extra as long as you send that $60 to the card via the payment panel above before interest applies. A card you actually pay down is a small, steady way to build payment history."
             };
           }
         },
@@ -308,7 +346,7 @@
             if (Math.random() < 0.25) {
               return {
                 cash: -75,
-                credit: -8,
+                credit: -14,
                 note: "One of the four payments got missed — plenty of BNPL apps report that to your credit file and tack on a fee. What looked like a fee-free way to spread out $60 turned into $75 and a ding on your score."
               };
             }
@@ -360,12 +398,12 @@
           }
         },
         {
-          label: "Skip it — put that $60 toward your credit card balance instead (or just keep it, if you're debt-free).",
+          label: "Skip it — keep the $60 in cash instead (put it toward the card yourself, if you want).",
           effect: function (state) {
             if (state.ccDebt > 0) {
               return {
-                ccDebt: -60,
-                note: "You slowed the debt that's compounding against you — and gave up guaranteed free money to do it. There's a real case for paying down anything above ~20% APR before investing at all. This isn't a slam dunk either way."
+                cash: 60,
+                note: "That $60 is yours to direct — nothing here pays the card down automatically. There's a real case for paying down anything above ~20% APR before investing at all, and the payment panel above is exactly how you'd act on that. Either way, you gave up guaranteed free money to keep the option open."
               };
             }
             return {
@@ -380,39 +418,24 @@
       id: "big-purchase",
       tag: "Big Purchase",
       title: "The dead laptop",
-      text: "Your laptop died and you need this exact $950 model for school or work — it's the one your program requires. A store offers '0% financing for 12 months' on it — but if it isn't fully paid off by month 12, many plans charge interest on the entire original amount, retroactively.",
+      text: "Your laptop died and you need this exact $650 model for school or work — it's the one your program requires.",
       choices: [
         {
-          label: "Save up for a few weeks and pay the full $950 in cash.",
+          label: "Save up and pay the full $650 in cash.",
           effect: function () {
             return {
-              cash: -950,
-              note: "A cash purchase carries zero risk of a surprise interest bill — the only cost is the few weeks you had to wait before you could afford it outright."
+              cash: -650,
+              note: "A cash purchase carries zero risk of interest — the only cost is the time it took to save up for it."
             };
           }
         },
         {
-          label: "Take the 0% financing and set a reminder to pay it off before month 12.",
+          label: "Put it on the credit card — pay it down yourself when you're ready.",
           effect: function () {
             return {
-              cash: -950,
-              note: "Deferred-interest plans work out fine only if you're disciplined about the deadline — miss it by even a day and many plans bill interest on the full original balance, not just what's left."
-            };
-          }
-        },
-        {
-          label: "Take the financing and just pay the minimum each month — figure it out later.",
-          effect: function () {
-            if (Math.random() < 0.3) {
-              return {
-                cash: -950,
-                note: "You cut it closer than planned, but the full balance got paid off right before the deadline hit. It worked out — this time. Deferred-interest plans depend entirely on follow-through, and follow-through isn't guaranteed."
-              };
-            }
-            return {
-              ccDebt: 950,
-              credit: -6,
-              note: "This is the exact scenario deferred-interest promotions are built to catch. 'Figure it out later' plus a hard deadline is a common way people end up owing far more than the sticker price."
+              ccDebt: 650,
+              credit: 4,
+              note: "The laptop is on the card now instead of draining your cash today. Whether that stays free depends entirely on you sending it to the card via the payment panel above before interest applies."
             };
           }
         }
@@ -428,7 +451,7 @@
           label: "Pay the phone bill a few days late — it probably won't matter.",
           effect: function () {
             return {
-              credit: -30,
+              credit: -45,
               note: "Payment history is the single biggest factor in your credit score. Even one bill reported 30+ days late can knock your score down significantly, and it can stay on your report for years."
             };
           }
@@ -438,7 +461,7 @@
           effect: function () {
             return {
               ccDebt: 85,
-              credit: 12,
+              credit: 18,
               note: "Autopay is one of the simplest ways to protect your score — a bill paid automatically can never become a late bill. A little predictable debt beats an unpredictable hit to your payment history."
             };
           }
@@ -474,13 +497,6 @@
         if (state.ccDebt > 0 && state.loanDebt > 0) {
           return [
             {
-              label: "Put it all on the credit card — the higher rate.",
-              effect: function (s) {
-                var pay = Math.min(s.ccDebt, 200);
-                return { ccDebt: -pay, cash: 200 - pay, note: "Mathematically, this is almost always the strongest move — paying down the highest-rate debt first saves the most money over time, even though the loan balance doesn't move at all this round." };
-              }
-            },
-            {
               label: "Put it all on the student loan — get a balance fully gone sooner.",
               effect: function (s) {
                 var pay = Math.min(s.loanDebt, 200);
@@ -488,10 +504,16 @@
               }
             },
             {
-              label: "Split it evenly between both.",
+              label: "Put some toward the loan, keep the rest in cash to decide.",
               effect: function (s) {
-                var pay1 = Math.min(s.ccDebt, 100), pay2 = Math.min(s.loanDebt, 100);
-                return { ccDebt: -pay1, loanDebt: -pay2, cash: 200 - pay1 - pay2, note: "A hedge — neither balance drops as fast as it could on its own, but you're not betting everything on one strategy either." };
+                var pay = Math.min(s.loanDebt, 100);
+                return { loanDebt: -pay, cash: 200 - pay, note: "A hedge — the loan drops a little, and the rest stays liquid. If you'd rather send some of that cash at the credit card instead, the payment panel above is yours to use, any round, any amount." };
+              }
+            },
+            {
+              label: "Keep the whole $200 in cash — you'll decide where it goes.",
+              effect: function () {
+                return { cash: 200, note: "Nothing here auto-pays your card — that decision, and the timing of it, is entirely yours. The credit card is the higher-rate balance of the two; use the payment panel above whenever you're ready to put cash toward either one." };
               }
             }
           ];
@@ -499,16 +521,15 @@
         if (state.ccDebt > 0) {
           return [
             {
-              label: "Put the full $200 toward the credit card balance.",
-              effect: function (s) {
-                var pay = Math.min(s.ccDebt, 200);
-                return { ccDebt: -pay, cash: 200 - pay, note: "With only one high-interest balance in play, this is about as close to a clear call as this game gets — money that would otherwise pay roughly 26% interest is money well spent." };
+              label: "Keep the $200 in cash — you'll decide how much goes to the card.",
+              effect: function () {
+                return { cash: 200, note: "The card keeps compounding at roughly 26% APR either way, and nothing pays it down automatically — that call, and the amount, is yours. Use the payment panel above whenever you want to send cash at it." };
               }
             },
             {
-              label: "Keep the $200 in cash instead.",
+              label: "Invest the $200 instead.",
               effect: function () {
-                return { cash: 200, note: "The card keeps compounding either way. Keeping the cash only makes sense if you need it on hand for something more urgent than the interest you're paying." };
+                return { cash: -200, invest: 200, note: "A real trade-off — investing instead of paying down a card charging roughly 26% is a bet the market beats that guaranteed 'return,' which historically it usually doesn't. Still your call; the card isn't going anywhere on its own." };
               }
             }
           ];
@@ -525,7 +546,7 @@
             {
               label: "Invest the $200 instead.",
               effect: function () {
-                return { cash: -200, invest: 210, note: "With a relatively low-rate loan in the picture, investing this instead is a defensible bet — trading a guaranteed small return (avoided interest) for a probably-larger, less certain one." };
+                return { cash: -200, invest: 200, note: "With a relatively low-rate loan in the picture, investing this instead is a defensible bet — trading a guaranteed small return (avoided interest) for a probably-larger, less certain one." };
               }
             }
           ];
@@ -540,7 +561,7 @@
           {
             label: "Invest it.",
             effect: function () {
-              return { cash: -200, invest: 210, note: "With nothing else competing for it, letting this money start compounding is a reasonable default." };
+              return { cash: -200, invest: 200, note: "With nothing else competing for it, letting this money start compounding is a reasonable default." };
             }
           }
         ];
@@ -614,15 +635,15 @@
           label: "A single trending stock (or crypto) a friend won't stop talking about — high risk, high reward.",
           effect: function () {
             var roll = Math.random();
-            if (roll < 0.35) {
-              var big = 500 * (1 + randRange(0.4, 1.2));
-              return { cash: -500, invest: round2(big), note: "It paid off — big. Concentrated bets like this can pay off spectacularly. They can also go to zero. This round, it didn't." };
+            if (roll < 0.45) {
+              var big = 500 * (1 + randRange(0.5, 1.5));
+              return { cash: -500, invest: round2(big), note: "It paid off — big. Concentrated bets like this can pay off spectacularly. They can also go to zero. This round, it didn't, and it's a big part of why people keep making this bet despite the risk." };
             }
-            if (roll < 0.7) {
-              var mod = 500 * (1 + randRange(-0.3, -0.05));
+            if (roll < 0.8) {
+              var mod = 500 * (1 + randRange(-0.25, -0.05));
               return { cash: -500, invest: round2(mod), note: "A meaningful loss. Putting everything into one asset means one asset's bad month is your whole portfolio's bad month — there's no diversification cushioning the drop." };
             }
-            return { cash: -500, invest: 0, note: "It went to zero. This is the actual, non-hypothetical risk of a concentrated bet on one speculative asset — not likely on any single try, but not rare enough to ignore either." };
+            return { cash: -500, invest: 0, note: "It went to zero. This is the actual, non-hypothetical risk of a concentrated bet on one speculative asset — the odds were in your favor overall, but 'in your favor' still leaves real room to lose everything on any single try." };
           }
         }
       ]
@@ -634,14 +655,12 @@
       text: "A graduation gift lands in your account: $1,000, no strings attached.",
       choices: [
         {
-          label: "Put it toward your highest-interest debt — or invest it if you're debt-free.",
+          label: "Keep it as cash to pay down debt yourself — or invest it if you're debt-free.",
           effect: function (state) {
             if (state.ccDebt > 0) {
-              var pay = Math.min(state.ccDebt, 1000);
               return {
-                ccDebt: -pay,
-                cash: 1000 - pay,
-                note: "Paying down high-interest debt with a windfall is, in almost every case, the mathematically strongest use of unexpected money — avoiding 26% interest is a guaranteed 'return' that beats what the market delivers most years."
+                cash: 1000,
+                note: "Paying down high-interest debt with a windfall is, in almost every case, the mathematically strongest use of unexpected money — avoiding 26% interest is a guaranteed 'return' that beats what the market delivers most years. Nothing here does that for you automatically, though; the full $1,000 is sitting in cash, and the payment panel above is how you'd actually send some (or all) of it at the card."
               };
             }
             return {
@@ -654,11 +673,9 @@
           label: "Split it — half toward savings or debt, half toward something fun.",
           effect: function (state) {
             if (state.ccDebt > 0) {
-              var pay = Math.min(state.ccDebt, 500);
               return {
-                ccDebt: -pay,
-                cash: 500 - pay + 500,
-                note: "A balanced move — you knock down some debt (or build savings) while still enjoying part of the windfall today."
+                cash: 1000,
+                note: "Half of this is earmarked in your head for savings or debt, half for something fun — but it's all sitting in cash for now. If you want that first half actually chipping away at the card, the payment panel above is where that happens."
               };
             }
             return {
@@ -675,7 +692,7 @@
             var gamble = roll < 0.4 ? 200 * (1 + randRange(0.3, 1.0)) : 200 * (1 + randRange(-0.7, -0.1));
             return {
               invest: round2(Math.max(0, gamble)),
-              cash: 300,
+              cash: 0,
               note: gamble > 200
                 ? "The tip actually paid off — enjoy it, but a friend's hot tip working out once isn't a strategy, it's a coin flip that landed well."
                 : "The tip didn't pan out. 'My friend heard about this stock' is one of the least reliable ways money changes hands, and this round is a small, low-stakes reminder why."
@@ -697,9 +714,9 @@
           }
         },
         {
-          label: "Go now, but put the $120 copay on a credit card you'll pay off.",
+          label: "Go now, but put the $120 copay on a credit card — pay it down yourself later.",
           effect: function () {
-            return { cash: -120, credit: 2, note: "Same visit, same cost, just moved onto a card you're paying off — the timing of your cash flow changed, not the actual cost." };
+            return { ccDebt: 120, credit: 4, note: "Same visit, same cost, just moved onto the card instead of debit — the timing of your cash flow changed, not the actual cost, as long as you send that $120 to the card via the payment panel above before interest applies." };
           }
         },
         {
@@ -709,6 +726,47 @@
               return { cash: 0, note: "It cleared up on its own. Skipping it cost nothing this time — which is exactly the outcome that makes people comfortable skipping the next one, too." };
             }
             return { cash: -650, note: "It didn't clear up — it got worse, and turned into a $650 emergency room visit instead of a $120 copay. Deferred care is one of the more common ways a small, known cost turns into a large, unknown one." };
+          }
+        }
+      ]
+    },
+    {
+      id: "rent-renewal",
+      tag: "Housing",
+      title: "The lease renewal",
+      text: "Your lease is up. Going month-to-month raises your rent by $120/month starting next month. Signing a new 12-month lease locks in a smaller increase — just $40/month — but you're committed for a year even if you want to move.",
+      choices: [
+        {
+          label: "Sign the 12-month lease — lock in the smaller $40/month increase.",
+          effect: function () {
+            return {
+              cash: -40,
+              note: "Over a full year, that's $80 a month less than going month-to-month — close to $1,000 saved for accepting a year of commitment. The trade-off is real: if your plans change, breaking a lease usually costs more than the rent you saved."
+            };
+          }
+        },
+        {
+          label: "Go month-to-month — pay the bigger increase for the freedom to move anytime.",
+          effect: function () {
+            return {
+              cash: -120,
+              note: "Flexibility has a price, and this is it — three times the increase of locking in a lease. It's worth paying if your plans are genuinely uncertain; it's an expensive habit if they're not."
+            };
+          }
+        },
+        {
+          label: "Try to negotiate a smaller increase before deciding.",
+          effect: function () {
+            if (Math.random() < 0.5) {
+              return {
+                cash: -20,
+                note: "The landlord met you partway — half the lease-lock increase, with none of the year-long commitment. Asking costs nothing but a slightly awkward conversation, and it doesn't always work, but it worked this time."
+              };
+            }
+            return {
+              cash: -120,
+              note: "The landlord didn't budge, and without a signed lease you're on the standard month-to-month rate. Negotiating was still worth trying — it just doesn't always pay off, and the fallback here is the same increase as going month-to-month outright."
+            };
           }
         }
       ]
@@ -734,7 +792,7 @@
           effect: function (state) {
             state.hasInsurance = false;
             return {
-              cash: 15,
+              cash: 0,
               note: "This can work out fine — until it doesn't. Skipping insurance is a bet that nothing bad happens; when something does, the cost is rarely small, and it lands all at once, right when you can least afford it."
             };
           }
@@ -794,10 +852,10 @@
           label: "Cosign the loan.",
           effect: function () {
             if (Math.random() < 0.7) {
-              return { credit: 4, note: "Your cousin paid it down responsibly — a small positive mark, and a favor that didn't cost you anything but the risk you carried the entire time." };
+              return { credit: 6, note: "Your cousin paid it down responsibly — a small positive mark, and a favor that didn't cost you anything but the risk you carried the entire time." };
             }
             var owed = round2(2400 * randRange(0.4, 1));
-            return { ccDebt: owed, credit: -45, note: "Your cousin fell behind, and as cosigner, their missed payments became your problem — both " + fmt(owed) + " of the balance and a real hit to your own credit. Cosigning is a genuine favor, but it's a loan in your name too, whether or not you're the one driving the car." };
+            return { ccDebt: owed, credit: -60, note: "Your cousin fell behind, and as cosigner, their missed payments became your problem — both " + fmt(owed) + " of the balance and a real hit to your own credit. Cosigning is a genuine favor, but it's a loan in your name too, whether or not you're the one driving the car." };
           }
         },
         {
@@ -819,7 +877,7 @@
           effect: function () {
             return {
               ccDebt: 650,
-              credit: -14,
+              credit: -22,
               note: "Utilization — how much of your limit you're using — is the second-biggest factor in your score, right after payment history. Going above roughly 30% of your limit can drop your score even if you never miss a payment."
             };
           }
@@ -828,9 +886,9 @@
           label: "Split it into two $325 purchases, paying down between statements.",
           effect: function () {
             return {
-              ccDebt: 170,
-              credit: -3,
-              note: "Spreading a purchase so your reported balance stays lower keeps your utilization ratio healthier, even though you're borrowing the same total amount overall."
+              ccDebt: 650,
+              credit: -5,
+              note: "Spreading a purchase so your reported balance stays lower keeps your utilization ratio healthier, even though you're borrowing the same total $650 overall — the payment panel above is still how that balance actually comes down."
             };
           }
         },
@@ -839,7 +897,7 @@
           effect: function () {
             return {
               ccDebt: 650,
-              credit: -2,
+              credit: -3,
               note: "A higher limit means the same $650 charge is a smaller share of what's available — same spending, healthier-looking utilization. The increase request itself can trigger a small inquiry ding of its own, which is why this isn't a completely free move."
             };
           }
@@ -848,9 +906,49 @@
           label: "Put $325 on this card and open a second card for the rest.",
           effect: function () {
             return {
-              ccDebt: 325,
-              credit: -10,
-              note: "A new account brings a hard inquiry and shortens your average account age, both of which cost a few points right away — but it also means neither card is anywhere near maxed. Whether that trade is worth it usually depends on whether you actually needed more available credit long-term."
+              ccDebt: 650,
+              credit: -16,
+              note: "A new account brings a hard inquiry and shortens your average account age, both of which cost a few points right away — but it also means neither card is anywhere near maxed, even though the $650 total is exactly the same as charging it to one card. Whether that trade is worth it usually depends on whether you actually needed more available credit long-term."
+            };
+          }
+        }
+      ]
+    },
+    {
+      id: "identity-theft",
+      tag: "Fraud & Protection",
+      title: "A charge you didn't make",
+      text: "Checking your statement, you spot a $600 charge from a store you've never set foot in. It isn't yours.",
+      choices: [
+        {
+          label: "Report it as fraud immediately.",
+          effect: function () {
+            return {
+              note: "Report it before the dispute window closes and federal law caps your liability at $0 — the charge gets reversed, and it never becomes your debt. Fraud protection is one of the few genuinely free safety nets in personal finance, but only if you actually use it."
+            };
+          }
+        },
+        {
+          label: "Just pay it — dealing with the bank's fraud department sounds like a hassle.",
+          effect: function () {
+            return {
+              ccDebt: 600,
+              note: "You paid for a crime that wasn't yours. The dispute process exists specifically so you don't have to — skipping it turned a free fix into a real $600 balance sitting on your card."
+            };
+          }
+        },
+        {
+          label: "Ignore it for now and hope it resolves itself.",
+          effect: function () {
+            if (Math.random() < 0.45) {
+              return {
+                note: "The bank's own fraud detection caught it and reversed the charge before it became your problem — you got lucky. That's not something to count on; reporting it yourself is the reliable version of this same outcome."
+              };
+            }
+            return {
+              ccDebt: 600,
+              credit: -14,
+              note: "Nobody caught it in time. Once the dispute window closes, the charge — and the higher balance it left behind — becomes yours to deal with, along with a ding to your score from the sudden jump in utilization."
             };
           }
         }
@@ -876,8 +974,8 @@
           effect: function () {
             return {
               invest: 175,
-              cash: 100,
-              note: "A balanced approach — you get to enjoy part of the raise now while still increasing what you're building for later."
+              cash: 0,
+              note: "A balanced approach — half gets banked and keeps compounding, half goes toward actually enjoying the raise today. Spent is spent, though — only the invested half is still there to show for it."
             };
           }
         },
@@ -885,8 +983,8 @@
           label: "Spend the whole raise — new gear, upgraded lifestyle.",
           effect: function () {
             return {
-              cash: 75,
-              note: "There's nothing wrong with enjoying more income — the risk is that spending expands to fill every raise, so your savings rate never actually improves no matter how much you go on to earn."
+              cash: 0,
+              note: "There's nothing wrong with enjoying more income — the risk is that spending expands to fill every raise, so your savings rate never actually improves no matter how much you go on to earn. The whole $350 went out the door, and none of it is left to show for it."
             };
           }
         }
@@ -973,12 +1071,16 @@
     STARTING_STATE: STARTING_STATE,
     ROUNDS: ROUNDS,
     applyTick: applyTick,
+    ensureAccrualSchedule: ensureAccrualSchedule,
+    resetAccrualSchedule: resetAccrualSchedule,
     creditBand: creditBand,
     netWorth: netWorth,
     clampCredit: clampCredit,
     round2: round2,
     settleCash: settleCash,
     buildTakeaway: buildTakeaway,
-    MARKET_DIP_BEFORE_ROUND: MARKET_DIP_BEFORE_ROUND
+    MARKET_DIP_BEFORE_ROUND: MARKET_DIP_BEFORE_ROUND,
+    DEBT_ACCRUAL_EVERY_N_ROUNDS: DEBT_ACCRUAL_EVERY_N_ROUNDS,
+    INVEST_TICK_EVERY_N_ROUNDS: INVEST_TICK_EVERY_N_ROUNDS
   };
 })(window);
